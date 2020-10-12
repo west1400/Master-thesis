@@ -1,0 +1,292 @@
+$string yesorno YES
+CLEAR REVERT=NO
+THREED XORIGIN=0 YORIGIN=0 ZORIGIN=0 ROTX=-65 ROTY=0 ROTZ=-45 XASPECT=1 YASPECT=1 ZASPECT=1 SIZE=1 FACETANGLE=5 PERSPECTIVE=YES LINECOLOUR=YES OPTION=SETVIEW 
+
+/$string dbasefile '&COMIBASENAME&'
+
+// set analysis to EM harmonic
+ANALYSISDATA OPTION=SET PROGRAM=ELEKTRASS CONVTOL=1e-08 HX=0 HY=0 HZ=0 LINEAR=YES RHS=ADAPTIVE USEDEFORMEDMESH=NO
+
+// vacuum chamber properties
+VARIABLE OPTION=PARAMETER, NAME=#NrLayers, VALUE=2, DESCRIPTION='layers inside material sheets'
+VARIABLE OPTION=PARAMETER, NAME=#c, VALUE=0.01, DESCRIPTION='unit conversion factor'
+
+///input parameters///
+
+//Vacuum Chamber tube
+
+//Conductive, non-magnetic electrodes
+VARIABLE OPTION=PARAMETER, NAME=#ElectrodesCond, Value=2.5063e7, DESCRIPTION='AL6061 conductivity'
+/VARIABLE OPTION=PARAMETER, NAME=#ElectrodesCond, VALUE=2.13E6, DESCRIPTION='Titanium' 
+/VARIABLE OPTION=PARAMETER, NAME=#ElectrodesCond, Value=5.9E7, DESCRIPTION='Cu conductivity'
+
+
+// Depth at which field strength should attenuate to 1/e of surface value
+// Being calculated for the electrode material for a 30 Hz field
+VARIABLE OPTION=PARAMETER, NAME=#skindepth, VALUE=sqrt(1/(#ElectrodesCond*(1.25663706e-6)*(3.14159)*30)), DESCRIPTION='Skin depth of electrodes at 30 Hz'
+
+//Non-conductive, non-magnetic vacuum chamber
+VARIABLE OPTION=PARAMETER, NAME=#VacuumChambCond, VALUE=2.5063e7, DESCRIPTION='Aluminium' 
+//VALUE=2.5E6, VALUE=2.13E6
+
+VARIABLE OPTION=PARAMETER, NAME=#VacuumRadiusOuter, VALUE=0.5+0.00635, DESCRIPTION='Outer radius of vacuum chamber'
+VARIABLE OPTION=PARAMETER, NAME=#VacuumThickness, VALUE=0.00635, DESCRIPTION='Thickness of vacuum chamber tube'
+VARIABLE OPTION=PARAMETER, NAME=#VacuumHeight, VALUE=0.65, DESCRIPTION='Height of vacuum chamber'
+
+//Top & bottom flanges
+VARIABLE OPTION=PARAMETER, NAME=#FlangeThickness, VALUE=0.025, DESCRIPTION='flange thickness'
+VARIABLE OPTION=PARAMETER, NAME=#FlangeAddedRadius, VALUE=0.025, DESCRIPTION='how much further the flange extends past vacuum chamber tube'
+
+//Fiducial Volume; volume of interest within which neutron spin flips occur
+VARIABLE OPTION=PARAMETER NAME=#FidVolHeight Value=0.460 Description='Height of fiducial volume'
+VARIABLE OPTION=PARAMETER NAME=#FidVolRadius Value=0.300 Description='Radius of fiducial volume'
+
+VARIABLE OPTION=PARAMETER NAME=#FidVolHeight2 Value=#VacuumHeight+0.02 Description='Height of fiducial volume2'
+VARIABLE OPTION=PARAMETER NAME=#FidVolRadius2 Value=#VacuumRadiusOuter-#VacuumThickness+0.002 Description='Radius of fiducial volume2'
+
+//Air cylinder with the vacuum chamber
+VARIABLE OPTION=PARAMETER NAME=#AirAroundVacEnlargeFactor Value=1.05 Description='To make the air around the vacuum this much larger'
+
+//Electrodes
+$PARAMETER NAME=#ElecThickness Value=0.1 Description='Thickness of electrodes'
+$PARAMETER NAME=#ElecOuterRadius Value=0.28+0.25-0.18 Description='Outermost radius of the electrodes'
+$PARAMETER NAME=#InsElecRadDist Value=0.00025*2 Description='Distance between inner insulator face and electrode in radial direction; very small region where blending will happen (i.e. radial distance for which curvature occurs'
+$PARAMETER NAME=#InsDepth Value=0.015 Description='Depth of insulator groove'
+$PARAMETER NAME=#InsBlend Value=0.00475 Description='Blending on insulator groove to electrode face'
+$PARAMETER NAME=#BotElecZ Value=-0.211 Description='z position of bottom electrode'
+$PARAMETER NAME=#EDMCellRadius Value=0.25 Description='EDM cell inner radius'
+$PARAMETER NAME=#InsThick Value=0.01 Description='EDM cell insulator thickness'
+
+//1. Build the bottom electrode
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='BottomElectrode' X0=0 Y0=0 Z0=#BotElecZ-#ElecThickness X1=0 Y1=0 Z1=#BotElecZ MAJORRADIUS=#ElecOuterRadius MINORRADIUS=#ElecOuterRadius TOPRADIUS=#ElecOuterRadius TUBE=NO SHAPECONTROL=SIMPLE SIDES=2 MATERIALLABEL='Electrodes' LEVEL=1000
+
+//Blending outside face of electrodes
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='BottomElectrode' PTU=#ElecOuterRadius PTV=#ElecOuterRadius PTW=#BotElecZ-#ElecThickness
+BLEND OPTION=BLEND RADIUS=#ElecThickness/2
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='BottomElectrode' PTU=#ElecOuterRadius PTV=#ElecOuterRadius PTW=#BotElecZ
+BLEND OPTION=BLEND RADIUS=#ElecThickness/2
+
+//Insulator grooves
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME=BottomGroove X0=0 Y0=0 Z0=#BotElecZ-#InsDepth X1=0 Y1=0 Z1=#BotElecZ MAJORRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist MINORRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist TOPRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist Thickness=#InsThick+2*#InsElecRadDist TUBE=YES SHAPECONTROL=TUBE SIDES=2 MATERIALLABEL='Vacuum' LEVEL=10
+FILTER TYPE=CELL
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='BottomElectrode'
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='BottomGroove'
+COMBINE OPERATION=SUBTRACT +REGULAR
+
+//Blending insulator grooves for bottom electrode
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='BottomElectrode' PTU=0 PTV=#EDMCellRadius PTW=#BotElecZ
+BLEND OPTION=BLEND RADIUS=#InsBlend
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='BottomElectrode' PTU=0 PTV=#EDMCellRadius+#InsThick+2*#InsElecRadDist PTW=#BotElecZ
+BLEND OPTION=BLEND RADIUS=#InsBlend
+
+//Layering the bottom electrode and setting the mesh size (mesh of 0.01 for electrodes gives fluctuating results in the skin depth region; see AC Shielding presentation from April 29th)
+PICK OPTION=TOGGLE TYPE=FACE PTU=0 PTV=0 PTW=#BotElecZ-#ElecThickness UNIQUEBODYNAME='BottomElectrode'
+FACEDATA OPTION=MODIFY LEVEL=1000 BOUNDARYLABEL='Low Voltage' BACKMETHOD=GEOMETRY BACKLAYERS=21 BACKOFFSET=#skindepth/4
+PICK OPTION=CHANGE
+
+FILTER TYPE=CELL
+PICK OPTION=RESET
+PICK OPTION=TOGGLE | PICK PROPERTY=UniqueName LABEL='BottomElectrode'
+CELLDATA OPTION=MODIFY MATERIALLABEL='Electrodes' POTENTIAL=Default ELEMENTTYPE=Linear LEVEL=1000 SIZE=0.005 ELEMSHAPEPREF=NONE
+
+//2. Build the top electrode
+
+FILTER TYPE=BODY
+PICK OPTION=CHANGE
+PICK OPTION=TOGGLE PROPERTY=Name LABEL='BottomElectrode'
+TRANSFORM OPTION=COPY TYPE=REFLECT NU=0 NV=0 NW=1 COUNT=1 LABEL='TopElectrode'
+
+//3. Build the middle electrode
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='MiddleElectrode' X0=0 Y0=0 Z0=-#ElecThickness/2 X1=0 Y1=0 Z1=#ElecThickness/2 MAJORRADIUS=#ElecOuterRadius MINORRADIUS=#ElecOuterRadius TOPRADIUS=#ElecOuterRadius TUBE=NO SHAPECONTROL=SIMPLE SIDES=2 MATERIALLABEL='Electrodes' LEVEL=1000
+
+
+
+
+//Blend outer face of middle electrode
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='MiddleElectrode' PTU=#ElecOuterRadius PTV=#ElecOuterRadius PTW=-#ElecThickness/2
+BLEND OPTION=BLEND RADIUS=#ElecThickness/2
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='MiddleElectrode' PTU=#ElecOuterRadius PTV=#ElecOuterRadius PTW=#ElecThickness/2
+BLEND OPTION=BLEND RADIUS=#ElecThickness/2
+
+//Insulator grooves for top and bottom faces of the middle electrode
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME=MidGroove1 X0=0 Y0=0 Z0=(#ElecThickness/2)-#InsDepth X1=0 Y1=0 Z1=#ElecThickness/2 MAJORRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist MINORRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist TOPRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist Thickness=#InsThick+2*#InsElecRadDist TUBE=YES SHAPECONTROL=TUBE SIDES=2 MATERIALLABEL='Vacuum' LEVEL=10
+FILTER TYPE=CELL
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='MiddleElectrode'
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='MidGroove1'
+COMBINE OPERATION=SUBTRACT +REGULAR
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME=MidGroove2 X0=0 Y0=0 Z0=(-#ElecThickness/2) X1=0 Y1=0 Z1=(-#ElecThickness/2)+#InsDepth MAJORRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist MINORRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist TOPRADIUS=#EDMCellRadius+#InsThick+2*#InsElecRadDist Thickness=#InsThick+2*#InsElecRadDist TUBE=YES SHAPECONTROL=TUBE SIDES=2 MATERIALLABEL='Vacuum' LEVEL=10
+FILTER TYPE=CELL
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='MiddleElectrode'
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='MidGroove2'
+COMBINE OPERATION=SUBTRACT +REGULAR
+
+//Blending central electrode insulator grooves
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='MiddleElectrode' PTU=0 PTV=#EDMCellRadius PTW=#ElecThickness/2
+BLEND OPTION=BLEND RADIUS=#InsBlend
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='MiddleElectrode' PTU=0 PTV=#EDMCellRadius+#InsThick+2*#InsElecRadDist PTW=#ElecThickness/2
+BLEND OPTION=BLEND RADIUS=#InsBlend
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='MiddleElectrode' PTU=0 PTV=#EDMCellRadius PTW=-#ElecThickness/2
+BLEND OPTION=BLEND RADIUS=#InsBlend
+FILTER TYPE=EDGE
+PICK OPTION=TOGGLE TYPE=EDGE UNIQUEBODYNAME='MiddleElectrode' PTU=0 PTV=#EDMCellRadius+#InsThick+2*#InsElecRadDist PTW=-#ElecThickness/2
+BLEND OPTION=BLEND RADIUS=#InsBlend
+
+
+//Layering the central electrode and setting mesh size
+PICK OPTION=TOGGLE TYPE=FACE PTU=0 PTV=0 PTW=#ElecThickness/2 UNIQUEBODYNAME='MiddleElectrode'
+FACEDATA OPTION=MODIFY LEVEL=1000 FORMETHOD=NONE BACKMETHOD=GEOMETRY BACKLAYERS=21 BACKOFFSET=#skindepth/4
+PICK OPTION=CHANGE
+PICK OPTION=TOGGLE TYPE=FACE PTU=0.27 PTV=0 PTW=#ElecThickness/2 UNIQUEBODYNAME='MiddleElectrode'
+FACEDATA OPTION=MODIFY LEVEL=1000 FORMETHOD=NONE BACKMETHOD=GEOMETRY BACKLAYERS=21 BACKOFFSET=#skindepth/4
+
+FILTER TYPE=CELL
+PICK OPTION=RESET
+PICK OPTION=TOGGLE | PICK PROPERTY=UniqueName LABEL='MiddleElectrode'
+CELLDATA OPTION=MODIFY MATERIALLABEL='Electrodes' POTENTIAL=Default ELEMENTTYPE=Linear LEVEL=1000 SIZE=0.005 ELEMSHAPEPREF=NONE
+
+//4. Build the vacuum chamber
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='VacuumTube' X0=0 Y0=0 Z0=-0.5*#VacuumHeight X1=0 Y1=0 Z1=0.5*#VacuumHeight MAJORRADIUS=#VacuumRadiusOuter MINORRADIUS=#VacuumRadiusOuter TOPRADIUS=#VacuumRadiusOuter THICKNESS=#VacuumThickness TUBE=YES SHAPECONTROL=TUBE SIDES=2 MATERIALLABEL='VacuumTube' LEVEL=600
+
+// Build flanges
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='BottomFlange' X0=0 Y0=0 Z0=-0.5*#VacuumHeight-#FlangeThickness X1=0 Y1=0 Z1=-0.5*#VacuumHeight MAJORRADIUS=#VacuumRadiusOuter+#FlangeAddedRadius MINORRADIUS=#VacuumRadiusOuter+#FlangeAddedRadius TOPRADIUS=#VacuumRadiusOuter+#FlangeAddedRadius TUBE=NO SHAPECONTROL=SIMPLE SIDES=2 MATERIALLABEL='VacuumFlanges' LEVEL=500
+CYLINDER NAME='TopFlange' X0=0 Y0=0 Z0=0.5*#VacuumHeight X1=0 Y1=0 Z1=0.5*#VacuumHeight+#FlangeThickness MAJORRADIUS=#VacuumRadiusOuter+#FlangeAddedRadius MINORRADIUS=#VacuumRadiusOuter+#FlangeAddedRadius TOPRADIUS=#VacuumRadiusOuter+#FlangeAddedRadius TUBE=NO SHAPECONTROL=SIMLE SIDES=2 MATERIALLABEL='VacuumFlanges' LEVEL=500
+
+//5. Set mesh sizes for vacuum chamber and flanges
+FILTER TYPE=CELL
+PICK OPTION=RESET
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='VacuumTube'
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='BottomFlange'
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL='TopFlange'
+CELLDATA OPTION=MODIFY POTENTIAL=Total ELEMENTTYPE=Linear SIZE=0.01 ELEMSHAPEPREF=NONE
+
+// Layering the mesh inside vacuum chamber tube and flanges
+PICK OPTION=TOGGLE TYPE=FACE PTU=0 PTV=0 PTW=0.5*#VacuumHeight UNIQUEBODYNAME='TopFlange'
+FACEDATA OPTION=MODIFY LEVEL=700 FORMETHOD=NONE BACKMETHOD=GEOMETRY BACKLAYERS=4 BACKOFFSET=#FlangeThickness/4
+PICK OPTION=TOGGLE TYPE=FACE PTU=0 PTV=0 PTW=-(0.5*#VacuumHeight) UNIQUEBODYNAME='BottomFlange'
+FACEDATA OPTION=MODIFY LEVEL=700 FORMETHOD=NONE BACKMETHOD=GEOMETRY BACKLAYERS=4 BACKOFFSET=#FlangeThickness/4
+PICK OPTION=TOGGLE TYPE=FACE PTU=0 PTV=#VacuumRadiusOuter PTW=0 UNIQUEBODYNAME='VacuumTube'
+FACEDATA OPTION=MODIFY LEVEL=700 FORMETHOD=NONE BACKMETHOD=GEOMETRY BACKLAYERS=4 BACKOFFSET=#VacuumThickness/4
+
+
+
+
+//Electrostatic properties
+
+FILTER TYPE=BODY
+PICK OPTION=TOGGLE PROPERTY=UniqueName LABEL='TopFlange'
+PICK OPTION=TOGGLE PROPERTY=UniqueName LABEL='BottomFlange'
+PICK OPTION=TOGGLE PROPERTY=UniqueName LABEL='VacuumTube'
+FILTER TYPE=FACE
+PICK OPTION=CHANGE TYPE=FACE
+FACEDATA OPTION=MODIFY BOUNDARYLABEL='Low Voltage' LEVEL=500
+
+//6. Build fiducial volume
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='FidVol' X0=0 Y0=0 Z0=-0.5*#FidVolHeight X1=0 Y1=0 Z1=0.5*#FidVolHeight MAJORRADIUS=#FidVolRadius MINORRADIUS=#FidVolRadius TOPRADIUS=#FidVolRadius TUBE=NO SHAPECONTROL=SIMPLE SIDES=2 MATERIALLABEL='Vacuum' LEVEL=101
+
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='FidVol2' X0=0 Y0=0 Z0=-0.5*#FidVolHeight2 X1=0 Y1=0 Z1=0.5*#FidVolHeight2 MAJORRADIUS=#FidVolRadius2 MINORRADIUS=#FidVolRadius2 TOPRADIUS=#FidVolRadius2 TUBE=NO SHAPECONTROL=SIMPLE SIDES=2 MATERIALLABEL='Vacuum' LEVEL=100
+
+//Setting mesh size for fiducial volume
+FILTER TYPE=CELL
+PICK OPTION=RESET
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL=FidVol
+CELLDATA OPTION=MODIFY MATERIALLABEL='Vacuum' POTENTIAL=Reduced ELEMENTTYPE=Linear LEVEL=101 VOLUMELABEL='Fid_Vol' SIZE=0.01 ELEMSHAPEPREF=NONE
+
+
+FILTER TYPE=CELL
+PICK OPTION=RESET
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL=FidVol2
+CELLDATA OPTION=MODIFY MATERIALLABEL='Vacuum' POTENTIAL=Reduced ELEMENTTYPE=Linear LEVEL=100 VOLUMELABEL='Fid_Vol2' SIZE=0.01 ELEMSHAPEPREF=NONE
+
+//7. Build air volume around vacuum chamber
+
+SKETCH OBJECT=CYLINDER +COMPLETE
+CYLINDER NAME='AirAroundVac' X0=0 Y0=0 Z0=(-0.5*#VacuumHeight-#FlangeThickness)*#AirAroundVacEnlargeFactor X1=0 Y1=0 Z1=(0.5*#VacuumHeight+#FlangeThickness)*#AirAroundVacEnlargeFactor MAJORRADIUS=(#VacuumRadiusOuter+#FlangeAddedRadius)*#AirAroundVacEnlargeFactor MINORRADIUS=(#VacuumRadiusOuter+#FlangeAddedRadius)*#AirAroundVacEnlargeFactor TOPRADIUS=(#VacuumRadiusOuter+#FlangeAddedRadius)*#AirAroundVacEnlargeFactor TUBE=NO SHAPECONTROL=SIMPLE SIDES=2 MATERIALLABEL='Air' LEVEL=50
+
+//Setting mesh size for air around the vacuum
+FILTER TYPE=CELL
+PICK OPTION=RESET
+PICK OPTION=TOGGLE | PICK PROPERTY=Name LABEL=AirAroundVac
+CELLDATA OPTION=MODIFY MATERIALLABEL='Air' POTENTIAL=Reduced ELEMENTTYPE=Linear LEVEL=50 VOLUMELABEL='Air_Around_Vac' SIZE=0.01 ELEMSHAPEPREF=NONE
+
+//8. Build air volume inside vacuum chamber
+//required??
+
+//delete conductor file and create a new one
+$OS del '&dbasefile&.cond'
+EXPORT FILE='&dbasefile&.cond'
+
+//delete opera 3d database file and create new one
+$OS del '&dbasefile&.op3'
+EXPORT FILE='&dbasefile&.op3'
+
+//delete opera 3d post processor file and create new one
+$OS del '&dbasefile&.opc'
+EXPORT FILE='&dbasefile&.opc'
+
+//9. Materials and conductivity information
+MATERIALS PICK 'VacuumTube'
+MATERIALS MATERIALLABEL='VacuumTube' OPTION=METRE
+MATERIALS MATERIALLABEL='VacuumTube' OPTION=MODIFY MULINEARITY=LINEAR MUANISOTROPY=ISOTROPIC MU=1.0 SIGANISOTROPY=ISOTROPIC SIGMA=#VacuumChambCond SPHASE=0 USESIBC=NO
+MATERIALS UNPICK 'VacuumTube'
+MATERIALS PICK 'VacuumFlanges'
+MATERIALS MATERIALLABEL='VacuumFlanges' OPTION=METRE 
+MATERIALS MATERIALLABEL='VacuumFlanges' OPTION=MODIFY MULINEARITY=LINEAR MUANISOTROPY=ISOTROPIC MU=1.0 SIGANISOTROPY=ISOTROPIC SIGMA=#VacuumChambCond SPHASE=0 USESIBC=NO
+MATERIALS UNPICK
+MATERIALS PICK 'Electrodes'
+MATERIALS OPTION=MODIFY MULINEARITY=LINEAR MUANISOTROPY=ISOTROPIC MU=1.0 MPHASE=0 SIGANISOTROPY=ISOTROPIC SIGMA=#ElectrodesCond SPHASE=0 USESIBC=NO
+
+
+//10. Setting up background and symmetries
+
+THREED XORIGIN=0 YORIGIN=0 ZORIGIN=0 ROTX=-65 ROTY=0 ROTZ=-45 XASPECT=1 YASPECT=1 ZASPECT=1 SIZE=1 FACETANGLE=5 PERSPECT=YES LINECOLOUR=YES OPTION=SETVIEW 1
+
+//Applying tangential XY and ZX symmetries, and normal magnetic YZ symmetry
+BACKGROUND OPTION=SET SHAPE=CYLINDER SCALEZ=1 SCALER=1 XYSYMMETRYPLANE=YES ZXSYMMETRYPLANE=NO YZSYMMETRYPLANE=NO ROTZNUM=1
+BACKGROUND OPTION=SET SHAPE=CYLINDER SCALEZ=1 SCALER=1 XYSYMMETRYPLANE=YES YZSYMMETRYPLANE=NO ROTZNUM=1 ZXSYMMETRYPLANE=NO EMRXY=TANGMAGN EMRYZ=NORMMAGN EMRZX=TANGMAGN
+
+//Setting a drive label
+DRIVE PICK 'B1'
+DRIVE OPTION=MODIFY SCALE=1 | DRIVE UNPICK
+
+//11. Analysis settings\
+DBCASEDATA PROGRAM=ELEKTRASS OPTION=CLEAR
+DBCASEDATA PROGRAM=ELEKTRASS OPTION=REPLACE VALUE=30 INDEX=1
+ANALYSISDATA OPTION=SET PROGRAM=ELEKTRASS CONVTOL=1e-07 DRIVELABEL=B1 HX=15e-9/1.25663706e-6 HY=0 HZ=0 LINEAR=YES RHS=ADAPTIVE USEDEFORMEDMESH=NO
+
+MODEL CREATE
+
+
+
+//12. Surface Mesh
+MESH SIZE=0.01 NORMALTOL=30.0 SURFACETOL=0.0 TOLERANCE=1.0E-6 TYPE=PREFERTETRA
+
+//13. Volume Mesh
+FILL TOL=1.0E-6
+$abortcomi
+//14. Start solving
+SOLVERS ELEMENT=LINEAR | SOLVERS SOLVENOW=YES SAVEMODEL=YES |SOLVERS OPTION=TEST FILE='&dbasefile&'UNITS=METRE SURFACE=CURVED | COMMENT CLEAR=YES TYPE=DBTITLE | SOLVERS OPTION=OVERWRITE
