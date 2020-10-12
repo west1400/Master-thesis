@@ -1,0 +1,308 @@
+************************************************
+* BL1U SIMULATION CODE by Pietro Giampa        *
+* Based on Rachel Wang UBC Thesis, 2018-2019   *
+* Based on code for BL1A by F.W. Jones, TRIUMF *
+* Last updated: June 8, 2019                   *
+************************************************
+
+#param -unset doStochastics=1
+#physics QGSP_BIC doStochastics=$doStochastics
+#param nevt=50000
+#param Mp=938.272 KE=480.0 # Mass and Energy of the Proton
+#param Pp=sqrt(($Mp+$KE)*($Mp+$KE)-$Mp*$Mp)
+#param -unset pMomentumRef=$Pp  
+#param worldMaterial=Vacuum
+#param -unset VacuumColor=0.,0.,0.
+#beam gaussian meanMomentum=$Pp nEvents=$nevt particle=proton beamZ=0 beamX=0 beamY=0 sigmaX=5. sigmaY=5. format=root
+#reference referenceMomentum=$pMomentumRef particle=proton beamZ=0 beamX=0 beamXp=0 beamY=0 beamYp=0
+#particlecolor proton=1,0,0 neutron=0,1,1 gamma=0,1,0 e-=0,0,1 plus=1,0,1 minus=1,1,0 neutral=0,1,1 reference=1,1,1
+
+param -unset doStochastics=1
+physics QGSP_BIC doStochastics=$doStochastics
+param nEvents=100000
+param Mp=938.272 KE=480.0 # Mass and Energy of the Proton
+param Pp=sqrt(($Mp+$KE)*($Mp+$KE)-$Mp*$Mp)
+param -unset pMomentumRef=$Pp
+beam ascii filename=fort1.3 beamZ=0 nEvents=$nEvents
+param worldMaterial=Vacuum
+param -unset VacuumColor=0.,0.,0.
+reference referenceMomentum=$pMomentumRef particle=proton beamZ=0 beamX=0 beamXp=0 beamY=0 beamYp=0
+particlecolor proton=1,0,0 neutron=0,1,1 gamma=0,1,0 e-=0,0,1 plus=1,0,1 minus=1,1,0 neutral=0,1,1 reference=1,1,1
+
+
+*******************************
+#     ELEMENT DEFINITIONS     #
+*******************************
+
+# VIRTUAL DETECTORS #
+virtualdetector HARP0 radius=500 length=1 color=1,0,1 format=ascii
+place HARP0 z=1.00
+
+virtualdetector VD00 radius=500 length=1 color=1,0,1 format=ascii
+#place VD00 z=500
+
+***************************************************
+### Virtual detector every 10 cm to obtain beamsize
+***************************************************
+
+for i 100 200 300 400 500 1000 1100 1200 1700 1800 1900 2000 2100 2200 2300 2400 2500 3100 3200 3300 3400 3500 3600 3700 3800 3900 4000 4100 4200 4300  
+		virtualdetector VD_$i radius=500 length=1 color=1,0,1 format=ascii
+		place VD_$i z=$i
+endfor
+
+
+
+
+### QUADRUPOLES ###
+genericquad Q148 apertureRadius=103.124/2 ironRadius=914.4/2 fringe=1 fringeFactor=0.1 kill=0  ironColor=0,.9,.9
+genericquad Q198 apertureRadius=103.124/2 ironRadius=914.4/2 fringe=1 fringeFactor=0.1 kill=0  ironColor=0,.9,.9
+
+#param LQ148=609.6
+#param LQ198=711.2
+
+place Q148 rename=Q1 z=731.47 fieldLength=403.9 ironLength=403.9 gradient=10.3676
+#virtualdetector TEST radius=500 length=1 color=1,0,1 format=ascii
+#place TEST z=731.47
+virtualdetector VDQ1 radius=500 length=1 color=1,0,1 format=ascii
+place VDQ1 z=731.47+203
+
+place Q148 rename=Q2 z=1479.2 fieldLength=408.9 ironLength=408.9 gradient=-12.0273
+virtualdetector VDQ2 radius=500 length=1 color=1,0,1 format=ascii
+place VDQ2 z=1479.2+206
+
+place Q198 rename=Q3 z=2800 fieldLength=530.9 ironLength=530.9 gradient=11.8096
+virtualdetector VDQ3 radius=500 length=1 color=1,0,1 format=ascii
+place VDQ3 z=2800+267
+
+virtualdetector VDQ3.1 radius=500 length=1 color=1,0,1 format=ascii
+#place VDQ3.1 z=4300
+
+**************************************************************
+
+
+
+### 1VB1 BENDING DIPOLE ###
+param S=4395
+
+tune B1By z0=0 z1=10000 initial=-0.960539 step=0.001 expr=x1 tolerance=0.1 maxIter=10
+
+param LB1=1276.3
+
+genericbend B1 fieldWidth=1000 fieldHeight=102 fieldLength=$LB1 By=B1By fringeFactor=0.25 ironColor=1,0,0 ironWidth=1000 ironHeight=1000 ironLength=$LB1 
+#fieldHeight=102
+
+corner B1c1 z=$S rotation=Y+(19.8/2)
+place B1 z=$S+0.5*$LB1  # actual location of 1VB1
+virtualdetector VDVB1 radius=500 length=1 color=1,0,1 format=ascii
+place VDVB1 z=$S+$LB1+1
+
+#param Slb1=$S+0.5*$LB1
+corner B1c2 z=$S+$LB1 rotation=Y+(19.8/2)
+
+***************************************************
+### Virtual detector every 10 cm to obtain beamsize
+***************************************************
+
+for i 5700 5800 5900 6000 6100 6200 6300 6400 6500 6600 6700 7400 7500 8100 8200 8300 8800 8900 9000 9100 9200 9300 9400 9500 11100 11200 11300 11400 11500 11600 11700 11800 11900 12000 12100 12200 12300 12400 12500 12600 12700 12800 12900 13000 13100 13200 13300 13400 14500 14600 14700 14800 14900 15000 15100 15200 15300 15400 15500 15600 15700
+		virtualdetector VD_$i radius=500 length=1 color=1,0,1 format=ascii
+		place VD_$i z=$i
+endfor
+
+place Q198 rename=Q4 z=$S+2666.3 fieldLength=523.8 ironLength=523.8 gradient=5.28488
+virtualdetector VDQ4 radius=500 length=1 color=1,0,1 format=ascii
+place VDQ4 z=$S+2666.3+263
+
+place Q198 rename=Q5 z=$S+3435.9 fieldLength=532.1 ironLength=532.1 gradient=-6.82350
+virtualdetector VDQ5 radius=500 length=1 color=1,0,1 format=ascii
+place VDQ5 z=$S+3435.9+267
+
+place Q148 rename=Q6 z=$S+4197.9 fieldLength=406.4 ironLength=406.4 gradient=4.17698
+virtualdetector VDQ6 radius=500 length=1 color=1,0,1 format=ascii
+place VDQ6 z=$S+4197.9+205
+
+**************************************************************
+
+### KICKER ###
+#fieldexpr KICKfield time=if(0<t<0.000050,1,0) tmin=0 tmax=0.000060 Bz=-0.0283811 factorB=1.0 height=770 width=500 length=15000
+fieldexpr KICKfield time=if(0<t<0.000050,1,0) tmin=0 tmax=0.000060 Bz=-0.0283811 factorB=1.0 height=770 width=500 length=1500
+box KICKbox height=770 width=500 length=1500 color=1,1,0
+
+place KICKfield z=$S+5880.8 
+place KICKbox z=$S+5880.8
+virtualdetector VDKICK radius=500 length=1 color=1,0,1 format=ascii
+place VDKICK z=$S+5880.8+751
+
+**************************************************************
+
+### 1BVB2 ###
+box VB2 height=1000 width=1000 length=1000 color=.6,.6,.6
+place VB2 z=$S+9576
+virtualdetector VDBVB2 radius=500 length=1 color=1,0,1 format=ascii
+place VDBVB2 z=$S+9576+501
+
+**************************************************************
+
+### SEPTUM ###
+param D=$S+11405 #D= 15800, S=4395
+
+#tune B2By z0=$S+5000 z1=$D initial=-1.00585 step=0.0001 expr=x1 tolerance=0.1 maxIter=100
+
+param LSEPT=555
+#fieldmap SEPT filename=fort.2 current=0.205
+box SEPTBOX width=1277.874 height=1000 length=$LSEPT
+
+#place SEPT z=$D+0.5*$LSEPT
+#place SEPTBOX z=$D+0.5*$LSEPT rotation=Y+(2*4.51333)
+#place SEPTBOX z=$D+0.5*$LSEPT rotation=Y+(2*4.51333)
+#virtualdetector VDSEPT radius=500 length=1 color=1,0,1 format=ascii
+#place VDSEPT z=$D+$LSEPT+1 rotation=Z+(2*4.51333)
+
+***
+###Proper Septum model:
+***
+#param LSEPT=890
+#param LSEPT=1000
+#param SEPTCENTERX=19.1
+param SEPTCENTERX=19.13
+param SEPTCENTERY=431.3
+#param SEPTCENTERY=181.32
+
+box SEPTBOX2 width=800 height=900 length=$LSEPT
+place SEPTBOX2 z=$D+0.5*$LSEPT rotation=Y+(4.376) x=$SEPTCENTERX y=$SEPTCENTERY
+
+#SeptumField.table
+fieldmap SEPT filename=Septum2120A.table current=1 
+place SEPT z=$D+0.5*$LSEPT x=$SEPTCENTERX y=$SEPTCENTERY   # x,y and z are the position of element's center
+#place SEPTBOX z=$D+0.5*$LSEPT rotation=Y+(4.51333)
+
+# angle is rotation of z-axis counterclockwise (for top view), rotation is rotation of square at the end (counterclockwise)
+#Following corner commands are wrong, they only apply if a generic bender is used
+corner B2c3 z=$D rotation=Y+(9/2)
+zntuple format=ascii z=$D-5 referenceParticle=0
+corner B2c4 z=$D+$LSEPT rotation=Y+(9/2)
+zntuple format=ascii z=$D+5 referenceParticle=0
+
+
+***************************************************
+### Virtual detector every 10 cm to obtain beamsize
+***************************************************
+
+for i 16400 16500 16600 16700 16800 16900 17000 17100 17200 17300 17400 17500 17600 17700 17800 17900 18000 18100 18200 18300 18400 18500 18600 18700 18800 18900 19000 19100 19200 19300 19400 19500 19600 19700 19800 19900 20000 20100 20200 20300 20400 20500 20600 20700 20800 20900 21000
+		virtualdetector VD_$i radius=500 length=1 color=1,0,1 format=ascii
+		place VD_$i z=$i
+endfor
+#If CBY0 is included, remove VD 19300 19400 19500 19600 19700
+
+**************************************************************
+
+### CYBO0 ###
+
+#param LCBY0=550
+
+#tune CBY0y z0=0 z1=10000 initial=0 step=0.0001 expr=x1 tolerance=0.01 maxIter=10
+#genericbend CBYO  fieldWidth=1000 fieldHeight=102 fieldLength=$LCBY0 By=CBY0y  fringeFactor=0.25 ironColor=1,0,0 ironWidth=1000 ironHeight=1000 ironLength=$LCBY0 
+#fieldHeight=102
+
+#corner CBY01 z=$D+3702.12-225 rotation=Y+(0/2)
+#place CBYO  rename=CBYO. z=$D+3702.12  # actual location of CBY0
+#corner CBY02 z=$D+3702.12+225 rotation=Y+(0/2)
+#virtualdetector VDCBY0 radius=500 length=1 color=1,0,1 format=ascii
+#place VDCBY0 z=$S+3702.12+226
+
+**************************************************************
+
+### FIRST HARP MONITOR ###
+
+virtualdetector HARP1 radius=500 length=1 color=1,0,1 format=ascii
+place HARP1 z=$D+4109.72
+
+**************************************************************
+
+### SCALLOP 1UB0 ###
+param SP=$D+5300 #SP=21100, D= 15800, S=4395
+param LUB0=1200
+
+#tune B3By z0=$D-1000 z1=$SP+2000 initial=-0.361193 step=0.0001 expr=x1 tolerance=0.01 maxIter=1000
+#tune B3By z0=$SP z1=$SP+$LUB0 initial=-0.361193 step=0.0001 expr=x1 tolerance=0.01 maxIter=10
+tune B3By z0=0 z1=10000 initial=-0.361193 step=0.0001 expr=x1 tolerance=0.01 maxIter=10
+genericbend B3 fieldWidth=1000 fieldHeight=102 fieldLength=$LUB0 By=B3By fringeFactor=0.25 ironColor=1,0,0 ironWidth=1000 ironHeight=1000 ironLength=$LUB0 
+#fieldHeight=102
+
+corner B3c5 z=$SP rotation=Y+(7/2)
+place B3 rename=B3. z=$SP+0.5*$LUB0  # actual location of 1UB0
+corner B3c6 z=$SP+$LUB0 rotation=Y+(7/2)
+virtualdetector VDUB0 radius=500 length=1 color=1,0,1 format=ascii
+place VDUB0 z=$SP+$LUB0+1 rotation=Y-(7/2)
+
+**************************************************************
+
+***************************************************
+### Virtual detector every 10 cm to obtain beamsize
+***************************************************
+
+for i 22400 22500 22600 22700 22800 22900 23000 23100 23200 23300 23400 23500 23600 23700 23800 23900 24000 24100 24200 24300 24400 24500 24600 24700 24800 24900 25000 25100 25200 25300 25400 25500 25600 25700 25800 25900 26000 26100 26200 26300 26400 26500 26600 27000 27400 27500 27600 27700 27800 27900 28000 28100 28200 28300 28400 28500 28600 28700 28800 28900 29000 29100 29200 29300 29400 29500 29600 30000 30100 30200 30300 30400 30500 30600 30700 30800 30900 31000 31100 31200 31300 31400 31500 31550 
+		virtualdetector VD_$i radius=500 length=1 color=1,0,1 format=ascii
+		place VD_$i z=$i
+endfor
+
+
+### 1UQ1/Q2 QUADS ###
+genericquad UQ apertureRadius=103.124/2 ironRadius=533.4/2 fringe=1 fringeFactor=0.1 kill=1 ironColor=0,.9,.9
+
+param LUQ=261.8
+#SP=21100
+
+place UQ rename=UQ1 z=$SP+5687 fieldLength=$LUQ ironLength=$LUQ gradient=-6.35529
+virtualdetector VDUQ1 radius=500 length=1 color=1,0,1 format=ascii
+place VDUQ1 z=$SP+5687+132
+
+place UQ rename=UQ2 z=$SP+6107 fieldLength=$LUQ ironLength=$LUQ gradient=0
+virtualdetector VDUQ2 radius=500 length=1 color=1,0,1 format=ascii
+place VDUQ2 z=$SP+6107+132
+
+
+**************************************************************
+
+### RASTER MAGNET ###
+####fieldexpr RASTfield By=5.0 height=100 width=100 length=250
+###box RASTbox height=100 width=100 length=250 color=.9,.2,.5
+
+####place RASTfield z=$SP+6200
+###corner RMc1 z=$SP+6200 rotation=Y-(0.2)
+###place RASTbox z=$SP+6200
+
+**************************************************************
+
+### SECOND HARP MONITOR ###
+virtualdetector HARP2 radius=500 length=1 color=1,0,1 format=ascii
+place HARP2 z=$SP+7180.58
+
+**************************************************************
+
+
+### 1UCOL2 COLLIMATOR ###
+material MatCOL W,0.9 Ni,0.06 Cu,0.04 density=1.0
+
+#tubs 1UCOL2 innerRadius=40. outerRadius=95.25 length=299.9994 kill=1 material=MatCOL color=.9,.5,0
+tubs 1UCOL2 innerRadius=40. outerRadius=95.25 length=370 kill=1 material=MatCOL color=.9,.5,0
+param COL2=29797
+place 1UCOL2 z=$COL2
+virtualdetector VDCOL2 radius=500 length=1 color=1,0,1 format=ascii
+place VDCOL2 z=$COL2+185+1 
+
+**************************************************************
+
+virtualdetector HARP3 radius=500 length=1 color=1,0,1 format=ascii
+place HARP3 z=$SP+9946
+
+### SPALLATION TARGET ###
+#detector DetTrg radius=500 length=1 color=1,0,1 perTrack=1 kill=1 format=ascii
+#place DetTrg z=$SP+9870.48
+
+box Target width=78.0 height=57.0 length=120.0 material=W color=1,0,0 kill=1
+place Target z=$SP+10535
+
+**************************************************************
+
+
+
